@@ -43,6 +43,7 @@ export default function Treemap({ data }) {
       return {
         name,
         change: isFinite((last - first) / first) ? (last - first) / first : 0,
+        code: values[0].code,
         market_cap: values[0].market_cap
       };
     });
@@ -79,6 +80,7 @@ export default function Treemap({ data }) {
           .style("opacity", 1)
           .html(`
             <strong>${d.data.name}</strong><br/>
+            股票代码：${d.data.code}<br/>
             近十日涨跌幅：${(d.data.change * 100).toFixed(2)}%<br/>
             市值：${(d.data.market_cap / 1e8).toFixed(2)} 亿
           `);
@@ -98,9 +100,10 @@ export default function Treemap({ data }) {
       return Math.max(min, Math.min(max, Math.min(boxWidth, boxHeight) * scale));
     };
 
+    // 公司名称
     nodes.append("text")
       .attr("x", d => (d.x1 - d.x0) / 2)
-      .attr("y", d => (d.y1 - d.y0) / 2 - computeFontSize(d)*0.5)
+      .attr("y", d => (d.y1 - d.y0) / 2 - computeFontSize(d)*0.75)
       .attr("text-anchor", "middle")
       .attr("alignment-baseline", "middle")
       .style("font-size", d => `${computeFontSize(d)}px`)
@@ -112,6 +115,7 @@ export default function Treemap({ data }) {
       })
       .text(d => d.data.name);
 
+    // 涨跌幅
     nodes.append("text")
       .attr("x", d => (d.x1 - d.x0) / 2)
       .attr("y", d => (d.y1 - d.y0) / 2 + computeFontSize(d)*0.5)

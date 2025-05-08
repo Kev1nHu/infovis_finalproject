@@ -39,11 +39,15 @@ export default function LineChart({ data }) {
       .map(([name, values]) => {
         const sorted = values.sort((a, b) => new Date(a.date) - new Date(b.date));
         const base = sorted[0].close_price;
-        const valuesWithPct = sorted.map(d => ({
-          ...d,
-          date: new Date(d.date),
-          pct_change: (d.close_price / base) * 100
-        }));
+        const valuesWithPct = sorted.map((d, idx) => {
+          const prevClose = idx === 0 ? d.close_price : sorted[idx - 1].close_price;
+          return {
+            ...d,
+            date: new Date(d.date),
+            pct_change_base: (d.close_price / base) * 100,
+            pct_change_prev: (d.close_price / prevClose - 1) * 100  // 增加用于hover，基于前一天收盘价的涨跌幅
+          };
+        });
         return {
           name,
           values: valuesWithPct,
@@ -54,13 +58,16 @@ export default function LineChart({ data }) {
       .slice(0, 5);
 
     const allDates = sortedByMarketCap[0].values.map(d => d.date);
-    const x = d3.scaleTime().domain(d3.extent(allDates)).range([0, width]);
+    const x = d3.scalePoint()
+      .domain(allDates)
+      .range([0, width])
+      .padding(0.5);
 
     svg.append("g")
       .attr("transform", `translate(0,${height})`)
       .call(d3.axisBottom(x).tickFormat(d3.timeFormat("%m-%d")));
 
-    const allPct = sortedByMarketCap.flatMap(c => c.values.map(d => d.pct_change));
+    const allPct = sortedByMarketCap.flatMap(c => c.values.map(d => d.pct_change_base));
     const y = d3.scaleLinear()
       .domain([d3.min(allPct) * 0.98, d3.max(allPct) * 1.02])
       .range([height, 0]);
@@ -70,7 +77,7 @@ export default function LineChart({ data }) {
 
     const color = d3.scaleOrdinal(d3.schemeTableau10);
 
-    sortedByMarketCap.forEach(company => {
+    sortedByMarketCap.forEach((company, i) => {
       svg.append("path")
         .datum(company.values)
         .attr("fill", "none")
@@ -78,15 +85,16 @@ export default function LineChart({ data }) {
         .attr("stroke-width", 2)
         .attr("d", d3.line()
           .x(d => x(d.date))
-          .y(d => y(d.pct_change))
+          .y(d => y(d.pct_change_base))
         );
 
-      svg.selectAll(`circle-${company.name}`)
+      svg.selectAll(`circle-${i}`)
         .data(company.values)
         .enter()
         .append("circle")
         .attr("cx", d => x(d.date))
-        .attr("cy", d => y(d.pct_change))
+        .attr("class", `circle-${i}`)
+        .attr("cy", d => y(d.pct_change_base))
         .attr("r", 4)
         .attr("fill", color(company.name))
         .on("mouseover", (event, d) => {
@@ -95,8 +103,8 @@ export default function LineChart({ data }) {
             .html(`
               <strong>${company.name}</strong><br/>
               日期：${d3.timeFormat("%Y-%m-%d")(d.date)}<br/>
-              收盘：${d.close_price.toFixed(2)}<br/>
-              涨跌幅：${(d.pct_change - 100).toFixed(2)}%
+              收盘价：${d.close_price.toFixed(2)}<br/>
+              日涨跌幅：${d.pct_change_prev.toFixed(2)}%
             `);
         })
         .on("mousemove", event => {
@@ -107,6 +115,28 @@ export default function LineChart({ data }) {
         .on("mouseout", () => {
           tooltip.style("opacity", 0);
         });
+    });
+
+    // ✅ 添加 Legend（图例）
+    const legend = svg.append("g")
+      .attr("transform", `translate(${width + 10}, 0)`);
+
+    sortedByMarketCap.forEach((company, i) => {
+      const lineHeight = 20;
+      const yOffset = i * lineHeight;
+
+      legend.append("circle")
+        .attr("cx", 36)
+        .attr("cy", yOffset)
+        .attr("r", 6)
+        .style("fill", color(company.name));
+
+      legend.append("text")
+        .attr("x", 52)
+        .attr("y", yOffset + 4)
+        .text(company.name)
+        .attr("font-size", "13px")
+        .attr("fill", "#000");
     });
   }, [data]);
 
